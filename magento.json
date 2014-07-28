@@ -2,7 +2,7 @@
     "magento": {
         "application": {
             "name": "magento",
-				"uid": ":auto",
+            "uid": ":auto",
             "main_domain": "magento.dev",
             "directory": "/vagrant",
             "domain_map": {}
