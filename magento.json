@@ -1,0 +1,30 @@
+{
+    "magento": {
+        "application": {
+            "name": "magento",
+				"uid": ":auto",
+            "main_domain": "magento.dev",
+            "directory": "/vagrant",
+            "domain_map": {}
+        }
+    },
+    "php": {
+        "major_version": "5.4",
+        "directives": {
+
+        }
+    },
+    "recipes": [
+        "mysql::server",
+        "magento::application",
+        "magento::redis"
+    ],
+    "vm": {
+        "cpu": 4,
+        "memory": 1024,
+        "ip": "192.168.6.10",
+        "mount_dirs": {
+            ".": "/vagrant"
+        }
+    }
+}
