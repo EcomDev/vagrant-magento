@@ -1,6 +1,7 @@
 require 'json'
 
-magentoJson = JSON.parse(File.read('magento.json'))
+jsonFile = File.exists?('magento.local.json') ? 'magento.local.json' : 'magento.json'
+magentoJson = JSON.parse(File.read(jsonFile))
 
 Vagrant.configure("2") do |config|
   if Vagrant.has_plugin?("vagrant-berkshelf")
@@ -19,20 +20,7 @@ Vagrant.configure("2") do |config|
 
   if Vagrant.has_plugin?("vagrant-cachier")
     config.cache.scope = :box
-
-    config.cache.synced_folder_opts = {
-        type: :nfs,
-        mount_options: ['rw', 'tcp', 'nolock', 'async']
-    }
-
-    config.cache.auto_detect = false
-    config.cache.enable :apt
-    config.cache.enable :apt_lists
-    config.cache.enable :apt_cacher
-    config.cache.enable :gem
-    config.cache.enable :yum
-    config.cache.enable :pacman
-    config.cache.enable :npm
+    config.cache.auto_detect = true
   end
 
   if magentoJson['magento']['application'].key?('uid') && magentoJson['magento']['application']['uid'] === ':auto'
@@ -55,7 +43,7 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = magentoJson['magento']['application']['name']
 
   magentoJson['vm']['mount_dirs'].each do |local, guest|
-    config.vm.synced_folder local, guest, nfs: true, mount_options: ['rw', 'tcp', 'nolock', 'async']
+    config.vm.synced_folder local, guest, magentoJson['vm']['mount_dir_options'].symbolize_keys
   end
 
   host = RbConfig::CONFIG['host_os']

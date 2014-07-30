@@ -5,7 +5,14 @@
             "uid": ":auto",
             "main_domain": "magento.dev",
             "directory": "/vagrant",
+            "http_port": "8080",
             "domain_map": {}
+        },
+        "varnish": {
+            "backend": {
+                "node2": "node1"
+            },
+            "balancer": ["node1", "node2"]
         }
     },
     "php": {
@@ -19,15 +26,16 @@
             "preferred_state": "beta",
             "zend_extensions": ["xdebug.so"],
             "directives": {
-               "xdebug.remote_enable": "1",
-               "xdebug.remote_port": "9000",
-               "xdebug.remote_host": "192.168.6.1"
+                "xdebug.remote_enable": "1",
+                "xdebug.remote_port": "9000",
+                "xdebug.remote_host": "192.168.6.1"
             }
         }
     },
     "recipes": [
         "mysql::server",
         "magento::application",
+        "magento::varnish",
         "magento::redis"
     ],
     "vm": {
@@ -38,8 +46,7 @@
             ".": "/vagrant"
         },
         "mount_dir_options": {
-            "type": "nfs",
-            "mount_options": ["rw", "tcp", "async", "nolock"]
+            "type": "rsync"
         }
     }
 }

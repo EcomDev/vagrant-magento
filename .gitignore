@@ -3,3 +3,4 @@ Berksfile.lock
 var/*
 .idea/
 .vagrant/
+*.local.json
