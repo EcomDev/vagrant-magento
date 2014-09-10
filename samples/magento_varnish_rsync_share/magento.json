@@ -9,9 +9,14 @@
             "domain_map": {}
         },
         "varnish": {
+            "geoip": true,
+            "geoip_country_codes": ["US", "UA", "ES"],
             "backend": {
                 "node2": "node1"
             },
+            "ip_local": ["192.168.6.1"],
+            "ip_admin": ["192.168.6.1"],
+            "ip_refresh": ["192.168.6.1"],
             "balancer": ["node1", "node2"]
         }
     },
@@ -35,7 +40,7 @@
     "recipes": [
         "mysql::server",
         "magento::application",
-        "magento::varnish",
+        "magento_varnish::default",
         "magento::redis"
     ],
     "vm": {
