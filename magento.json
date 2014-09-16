@@ -1,11 +1,34 @@
 {
     "magento": {
         "application": {
-            "name": "magento",
-            "uid": ":auto",
-            "main_domain": "magento.dev",
-            "directory": "/vagrant",
-            "domain_map": {}
+            "name": "bestkite",
+            "main_domain": "bestkite.dev",
+            "directory": "<%=current_path%>",
+            "http_port": "8080",
+            "status_ips": ["192.168.6.1"],
+            "domain_map": {},
+            "php_extensions": {
+                "xdebug": {
+                    "preferred_state": "beta",
+                    "zend_extensions": ["xdebug.so"],
+                    "directives": {
+                        "xdebug.remote_enable": "1",
+                        "xdebug.remote_port": "9000",
+                        "xdebug.remote_host": "192.168.6.1"
+                    }
+                }
+            }
+        },
+        "varnish": {
+            "geoip": true,
+            "geoip_country_codes": ["US", "UA", "ES"],
+            "backend": {
+                "node2": "node1"
+            },
+            "ip_local": ["192.168.6.1"],
+            "ip_admin": ["192.168.6.1"],
+            "ip_refresh": ["192.168.6.1"],
+            "balancer": ["node1", "node2"]
         }
     },
     "php": {
@@ -14,32 +37,21 @@
 
         }
     },
-    "php_extensions": {
-        "xdebug": {
-            "preferred_state": "beta",
-            "zend_extensions": ["xdebug.so"],
-            "directives": {
-               "xdebug.remote_enable": "1",
-               "xdebug.remote_port": "9000",
-               "xdebug.remote_host": "192.168.6.1"
-            }
-        }
-    },
     "recipes": [
         "mysql::server",
         "magento::application",
-        "magento::redis"
+        "magento::redis",
+        "magento_varnish::default"
     ],
     "vm": {
         "cpu": 4,
         "memory": 1024,
-        "ip": "192.168.6.10",
+        "ip": "192.168.6.33",
         "mount_dirs": {
-            ".": "/vagrant"
+            "<%=current_path%>": "<%=current_path%>"
         },
         "mount_dir_options": {
-            "type": "nfs",
-            "mount_options": ["rw", "tcp", "async", "nolock"]
+            "type": "rsync"
         }
     }
 }

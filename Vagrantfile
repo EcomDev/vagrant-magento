@@ -1,9 +1,45 @@
 require 'json'
+require 'erubis'
+require 'vagrant/util/deep_merge'
 
-jsonFile = File.exists?('magento.local.json') ? 'magento.local.json' : 'magento.json'
-magentoJson = JSON.parse(File.read(jsonFile))
+data_loader = Proc.new do
+  current_path = File.realpath(File.dirname(__FILE__));
+  files_to_search = []
+  Dir.chdir(current_path) do
+    files_to_search << Dir.glob('magento.json')
+    files_to_search << Dir.glob('magento.*.json')
+  end
+
+  magento_json = {}
+
+  files_to_search.flatten!.uniq!
+
+  files_to_search.each do |file|
+    eruby = Erubis::Eruby.new(File.read(File.join(current_path, file)))
+    json_content = JSON.parse(eruby.result(binding()))
+
+    magento_json = Vagrant::Util::DeepMerge.deep_merge(magento_json, json_content) do |key, old_value, new_value|
+      return_value = new_value
+      if old_value.is_a?(Array)
+        return_value = []
+        old_value.each { |v| return_value << v }
+        if new_value.is_a?(Array)
+          return_value = new_value
+        else
+          return_value << new_value
+        end
+      end
+      return_value
+    end
+
+  end
+
+  magento_json
+end
 
 Vagrant.configure("2") do |config|
+  magento_json = data_loader.call
+
   if Vagrant.has_plugin?("vagrant-berkshelf")
     config.berkshelf.enabled = true
   end
@@ -23,8 +59,8 @@ Vagrant.configure("2") do |config|
     config.cache.auto_detect = true
   end
 
-  if magentoJson['magento']['application'].key?('uid') && magentoJson['magento']['application']['uid'] === ':auto'
-    magentoJson['magento']['application']['uid'] = Process.euid
+  if magento_json['magento']['application'].key?('uid') && magento_json['magento']['application']['uid'] === ':auto'
+    magento_json['magento']['application']['uid'] = Process.euid
   end
 
   # Box that is used for chef
@@ -39,27 +75,37 @@ Vagrant.configure("2") do |config|
   config.vm.box = "opscode-centos-6.5"
   config.vm.box_url = "https://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_centos-6.5_chef-provisionerless.box"
 
-  config.vm.network :private_network, ip: magentoJson['vm']['ip']
-  config.vm.hostname = magentoJson['magento']['application']['name']
+  config.vm.network :private_network, ip: magento_json['vm']['ip']
+  config.vm.hostname = magento_json['magento']['application']['name']
 
-  magentoJson['vm']['mount_dirs'].each do |local, guest|
-    config.vm.synced_folder local, guest, magentoJson['vm']['mount_dir_options'].symbolize_keys
+  skip_vagrant_dir = false
+  magento_json['vm']['mount_dirs'].each do |local, guest|
+    skip_vagrant_dir = true if local == '.'
+    config.vm.synced_folder local, guest, magento_json['vm']['mount_dir_options'].symbolize_keys
   end
 
-  host = RbConfig::CONFIG['host_os']
+  unless skip_vagrant_dir
+    config.vm.synced_folder ".", "/vagrant", :disabled => true
+  end
 
-  # Give VM 1/4 system memory & access to all cpu cores on the host
-  if host =~ /darwin/
-    cpus = `sysctl -n hw.ncpu`.to_i
-    # sysctl returns Bytes and we need to convert to MB
-    mem = `sysctl -n hw.memsize`.to_i / 1024 / 1024 / 4
-  elsif host =~ /linux/
-    cpus = `nproc`.to_i
-    # meminfo shows KB and we need to convert to MB
-    mem = `grep 'MemTotal' /proc/meminfo | sed -e 's/MemTotal://' -e 's/ kB//'`.to_i / 1024 / 4
-  else # sorry Windows folks, I can't help you
-    cpus = magentoJson['vm']['cpu']
-    mem = magentoJson['vm']['memory']
+
+  cpus = magento_json['vm']['cpu']
+  mem = magento_json['vm']['memory']
+
+  # Try to detect CPU and memory automatically if static flag is not set
+  unless magento_json['vm'].key?('static') && magento_json['vm']['static']
+    host = RbConfig::CONFIG['host_os']
+
+    # Give VM 1/4 system memory & access to all cpu cores on the host
+    if host =~ /darwin/
+      cpus = `sysctl -n hw.ncpu`.to_i
+      # sysctl returns Bytes and we need to convert to MB
+      mem = `sysctl -n hw.memsize`.to_i / 1024 / 1024 / 4
+    elsif host =~ /linux/
+      cpus = `nproc`.to_i
+      # meminfo shows KB and we need to convert to MB
+      mem = `grep 'MemTotal' /proc/meminfo | sed -e 's/MemTotal://' -e 's/ kB//'`.to_i / 1024 / 4
+    end
   end
 
   config.vm.provider :virtualbox do |vb|
@@ -69,19 +115,20 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision :chef_solo do |chef|
     chef.json = {
-        magento: magentoJson['magento'],
-        php: magentoJson[:php]
+        magento: magento_json['magento'],
+        php: magento_json['php']
     }
-    chef.run_list = magentoJson['recipes'].map {|v| "recipe[#{v}]"}
+    chef.run_list = magento_json['recipes'].map {|v| "recipe[#{v}]"}
   end
 
-  domain_aliases = [magentoJson['magento']['application']['main_domain']]
-  domain_aliases << magentoJson['magento']['application']['domain_map'].keys
-  if magentoJson['magento']['application']['domains'].is_a?(Array)
-    domain_aliases << magentoJson['magento']['application']['domains']
+  domain_aliases = [magento_json['magento']['application']['main_domain']]
+  domain_aliases << magento_json['magento']['application']['domain_map'].keys
+  if magento_json['magento']['application']['domains'].is_a?(Array)
+    domain_aliases << magento_json['magento']['application']['domains']
   end
 
   domain_aliases.flatten!.uniq!
+
   if Vagrant.has_plugin?("vagrant-hostmanager")
     config.hostmanager.aliases = domain_aliases
   end
