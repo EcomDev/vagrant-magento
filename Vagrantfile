@@ -79,9 +79,15 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = magento_json['magento']['application']['name']
 
   skip_vagrant_dir = false
+  mount_options = {}
+
+  magento_json['vm']['mount_dir_options'].each do |key, value|
+    mount_options[key.to_sym] = value;
+  end
+
   magento_json['vm']['mount_dirs'].each do |local, guest|
     skip_vagrant_dir = true if local == '.'
-    config.vm.synced_folder local, guest, magento_json['vm']['mount_dir_options'].symbolize_keys
+    config.vm.synced_folder local, guest, mount_options
   end
 
   unless skip_vagrant_dir
